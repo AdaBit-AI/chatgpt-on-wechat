@@ -16,6 +16,7 @@ from common.log import logger
 from common.token_bucket import TokenBucket
 from config import conf, load_config
 from bot.baidu.baidu_wenxin_session import BaiduWenxinSession
+from backend.database.NoSQL.mongodb import ChatHistoryDB
 
 # OpenAI对话模型API (可用)
 class ChatGPTBot(Bot, OpenAIImage):
@@ -31,7 +32,10 @@ class ChatGPTBot(Bot, OpenAIImage):
         if conf().get("rate_limit_chatgpt"):
             self.tb4chatgpt = TokenBucket(conf().get("rate_limit_chatgpt", 20))
         conf_model = conf().get("model") or "gpt-3.5-turbo"
-        self.sessions = SessionManager(ChatGPTSession, model=conf().get("model") or "gpt-3.5-turbo")
+
+        self.mongodb = ChatHistoryDB(db_name="chat_db")
+        self.mongodb.connect()
+        self.sessions = SessionManager(ChatGPTSession, self.mongodb, model=conf().get("model") or "gpt-3.5-turbo")
         # o1相关模型不支持system prompt，暂时用文心模型的session
 
         self.args = {

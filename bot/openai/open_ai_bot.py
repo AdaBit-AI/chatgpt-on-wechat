@@ -13,7 +13,7 @@ from bridge.context import ContextType
 from bridge.reply import Reply, ReplyType
 from common.log import logger
 from config import conf
-
+from backend.database.NoSQL.mongodb import ChatHistoryDB
 user_session = dict()
 
 
@@ -27,7 +27,8 @@ class OpenAIBot(Bot, OpenAIImage):
         proxy = conf().get("proxy")
         if proxy:
             openai.proxy = proxy
-
+        self.mongodb = ChatHistoryDB(db_name="chat_db")
+        self.mongodb.connect()
         self.sessions = SessionManager(OpenAISession, model=conf().get("model") or "text-davinci-003")
         self.args = {
             "model": conf().get("model") or "text-davinci-003",  # 对话模型的名称

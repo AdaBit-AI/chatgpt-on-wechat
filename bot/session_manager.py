@@ -1,7 +1,8 @@
 from common.expired_dict import ExpiredDict
 from common.log import logger
 from config import conf
-
+import sys
+import datetime
 
 class Session(object):
     def __init__(self, session_id, system_prompt=None):
@@ -14,7 +15,7 @@ class Session(object):
 
     # 重置会话
     def reset(self):
-        system_item = {"role": "system", "content": self.system_prompt}
+        system_item = {"role": "system", "content": self.system_prompt, "timestamp": datetime.datetime.now().isoformat()}
         self.messages = [system_item]
 
     def set_system_prompt(self, system_prompt):
@@ -22,11 +23,11 @@ class Session(object):
         self.reset()
 
     def add_query(self, query):
-        user_item = {"role": "user", "content": query}
+        user_item = {"role": "user", "content": query, "timestamp": datetime.datetime.now().isoformat()}
         self.messages.append(user_item)
 
     def add_reply(self, reply):
-        assistant_item = {"role": "assistant", "content": reply}
+        assistant_item = {"role": "assistant", "content": reply, "timestamp": datetime.datetime.now().isoformat()}
         self.messages.append(assistant_item)
 
     def discard_exceeding(self, max_tokens=None, cur_tokens=None):
@@ -37,7 +38,7 @@ class Session(object):
 
 
 class SessionManager(object):
-    def __init__(self, sessioncls, **session_args):
+    def __init__(self, sessioncls, chat_history_db, **session_args):
         if conf().get("expires_in_seconds"):
             sessions = ExpiredDict(conf().get("expires_in_seconds"))
         else:
@@ -45,6 +46,8 @@ class SessionManager(object):
         self.sessions = sessions
         self.sessioncls = sessioncls
         self.session_args = session_args
+        self.chat_history_db = chat_history_db
+
 
     def build_session(self, session_id, system_prompt=None):
         """
@@ -81,11 +84,14 @@ class SessionManager(object):
             logger.debug("raw total_tokens={}, savesession tokens={}".format(total_tokens, tokens_cnt))
         except Exception as e:
             logger.warning("Exception when counting tokens precisely for session: {}".format(str(e)))
+        self.chat_history_db.save_chat_history(session_id, session.messages)
+
         return session
 
     def clear_session(self, session_id):
         if session_id in self.sessions:
             del self.sessions[session_id]
+        self.chat_history_db.close()
 
     def clear_all_session(self):
         self.sessions.clear()
